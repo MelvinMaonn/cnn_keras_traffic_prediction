@@ -41,23 +41,25 @@ def get_batch_raw(image_list, start):
 def my_generator(image_paths, label, num_samples):
 
     while True:
-
-        image_list = []
+        batch_input_list = []
         label_list = np.zeros(shape=[FLAGS.batch_size, FLAGS.road_num])
-
         # num_samples需要改变
         for i in range(0, num_samples):
+            image_list = []
             for j in range(FLAGS.time_step):
-                image_raw = image.load_img(image_paths[i+j])
-                image_list.append(image_raw)
+                image_raw = image.load_img(image_paths[i+j], grayscale=True)
+                image_arr = image.img_to_array(image_raw)
+                image_arr = image_arr[:,:,0]
+                image_list.append(image_arr)
+            img = np.array(image_list)
+            batch_input_list.append(img)
+            label_list[i % FLAGS.batch_size] = label[i+FLAGS.time_step]
 
-            label_list[i] = label[i + FLAGS.time_step]
+            if len(batch_input_list) == (FLAGS.batch_size):
+                # print(np.array(batch_input_list).shape, label_list.shape)
+                yield np.array(batch_input_list), label_list
 
-            if len(image_list) == (FLAGS.batch_size*FLAGS.time_step):
-
-                yield image_list, label_list
-
-                image_list = []
+                batch_input_list = []
                 label_list = np.zeros(shape=[FLAGS.batch_size, FLAGS.road_num])
 
 
