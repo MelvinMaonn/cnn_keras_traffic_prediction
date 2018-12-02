@@ -6,6 +6,7 @@ from keras import Sequential
 from keras.models import Model
 from keras.layers import Dense, Activation, Convolution2D, MaxPooling2D, Flatten, Conv2D, Input, GlobalAveragePooling2D
 from metrics import *
+from keras.optimizers import Adam
 
 import numpy as np
 from utils import FLAGS
@@ -15,7 +16,7 @@ from keras.metrics import mean_absolute_percentage_error
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 batch_size = 60
 nb_classes = 1
@@ -39,21 +40,21 @@ csv_logger = CSVLogger('cnn_keras.csv')
 # model = ResNet50(include_top=False, weights=None, input_shape=(img_channels, img_rows, img_cols), pooling='max')
 
 # TODO how to change the input channel
-inputs = Input(shape=(12, img_rows, img_cols))
-x = Conv2D(filters=64, kernel_size=3, strides=1, padding='same', data_format='channels_first',  activation="relu")(inputs)
-x = MaxPooling2D(pool_size=2, strides=2, padding='same', data_format='channels_first')(x)
+inputs = Input(shape=(img_rows, img_cols, 12))
+x = Conv2D(filters=64, kernel_size=3, strides=1, padding='same',  activation="relu")(inputs)
+x = MaxPooling2D(pool_size=2, strides=2, padding='same')(x)
 
-x = Conv2D(filters=128, kernel_size=3, strides=1, padding='same', data_format='channels_first',  activation="relu")(inputs)
-x = MaxPooling2D(pool_size=2, strides=2, padding='same', data_format='channels_first')(x)
+x = Conv2D(filters=128, kernel_size=3, strides=1, padding='same',  activation="relu")(inputs)
+x = MaxPooling2D(pool_size=2, strides=2, padding='same')(x)
 
-x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same', data_format='channels_first',  activation="relu")(x)
-x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same', data_format='channels_first',  activation="relu")(x)
-x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same', data_format='channels_first',  activation="relu")(x)
-x = MaxPooling2D(pool_size=2, strides=2, padding='same', data_format='channels_first')(x)
+x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same',  activation="relu")(x)
+x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same', activation="relu")(x)
+x = Conv2D(filters=256, kernel_size=3, strides=1, padding='same', activation="relu")(x)
+x = MaxPooling2D(pool_size=2, strides=2, padding='same')(x)
 
-x = Conv2D(filters=128, kernel_size=(1,1), data_format='channels_first', activation='relu')(x)
-x = Conv2D(filters=128, kernel_size=(3,3), data_format='channels_first', activation='relu')(x)
-x = MaxPooling2D(pool_size=2, strides=2, padding='same', data_format='channels_first')(x)
+x = Conv2D(filters=128, kernel_size=(1,1), activation='relu')(x)
+x = Conv2D(filters=128, kernel_size=(3,3), activation='relu')(x)
+x = MaxPooling2D(pool_size=2, strides=2, padding='same')(x)
 
 # x = GlobalAveragePooling2D()(x)
 x = Flatten()(x)
@@ -91,28 +92,29 @@ model = Model(inputs=inputs, outputs=x)
 # model.add(Dense(655))
 # model.add(Activation('relu'))
 
+optimizer = Adam(lr=1e-3, decay=0.8)
 model.compile(loss='mae',
-              optimizer='adam',
+              optimizer=optimizer,
               metrics=[masked_rmse_tf, masked_mae_tf, masked_mape_tf])
 
 ckpt = ModelCheckpoint('weights.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_loss', verbose=1, save_best_only=True,
                        save_weights_only=False, mode='auto', period=1)
 # tensor_board = TensorBoard(log_dir='./logs', histogram_freq=0.1, batch_size=32, write_graph=True, write_grads=True, write_images=True, embeddings_freq=0.1, embeddings_layer_names=None, embeddings_metadata=None)
 
-path_train_image = rd.get_files('/mnt/data5/mm/data/traffic/train_2/')
-train_label = np.genfromtxt('/mnt/data5/mm/PycharmProjects/cnn_traffic_prediction/data/800r_train_2.txt')
+path_train_image = rd.get_files('/mnt/data1/zll/mm/data/train_2/')
+train_label = np.genfromtxt('/mnt/data1/zll/mm/PycharmProjects/seq2seq_traffic_predict/data/800r_train_2.txt')
 train_generator = rd.my_generator(path_train_image, train_label, num_train_samples)
 
-path_train_image = rd.get_files('/mnt/data5/mm/data/traffic/test/')
-train_label = np.genfromtxt('/mnt/data5/mm/PycharmProjects/cnn_traffic_prediction/data/800r_test.txt')
-val_generator = rd.my_generator(path_train_image, train_label, num_val_samples)
+path_val_image = rd.get_files('/mnt/data1/zll/mm/data/test/')
+val_label = np.genfromtxt('/mnt/data1/zll/mm/PycharmProjects/seq2seq_traffic_predict/data/800r_test.txt')
+val_generator = rd.my_generator(path_val_image, val_label, num_val_samples)
 
 model.fit_generator(train_generator,
                     steps_per_epoch=num_batches_train_per_epoch,
                     validation_data=val_generator,
                     validation_steps=num_batches_val_per_epoch,
                     epochs=FLAGS.num_epochs, max_queue_size=100,
-                    callbacks=[lr_reducer, early_stopper, csv_logger, ckpt])
+                    callbacks=[lr_reducer, early_stopper, csv_logger, ckpt]) #lr_reducerf
 
 
 '''
